@@ -7,6 +7,7 @@ import 'package:login_signup/widgets/custom_scaffold.dart';
 import '../theme/theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -28,7 +29,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   try {
     final response = await http.post(
-      Uri.parse("http://10.0.2.2:5000/signin"),
+      Uri.parse("http://10.0.2.2:5000/auth/signin"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "email": emailController.text,
@@ -40,8 +41,15 @@ class _SignInScreenState extends State<SignInScreen> {
 
     if (response.statusCode == 200) {
 
-      // Vérifier le rôle
-      if (data["role"] == "USER") {
+      // ✅ Sauvegarder les infos utilisateur
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString("username", data["username"]);
+      await prefs.setString("email", data["email"]);
+      await prefs.setString("token", data["token"]);
+      await prefs.setString("role", data["role"]);
+
+      // ✅ Vérifier le rôle
+      if (data["role"] == "user") {
 
         Navigator.pushReplacement(
           context,
