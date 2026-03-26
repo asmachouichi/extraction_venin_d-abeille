@@ -3,7 +3,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 class CustomLineChart  extends StatelessWidget{
-  const CustomLineChart ({super.key});
+  const CustomLineChart ({super.key,required this.data});
+
+  final List<FlSpot> data;
   @override
   Widget build (BuildContext context) {
     return Card(
@@ -14,6 +16,8 @@ class CustomLineChart  extends StatelessWidget{
    
   }
   LineChartBarData  _buildLineChartBarData (){
-    return LineChartBarData();
+    return LineChartBarData(
+      spots: data,
+    );
   }
 }

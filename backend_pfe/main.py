@@ -1,43 +1,34 @@
-from flask import Flask, request, jsonify
-import pandas as pd
+from flask import Flask, request
+import csv
 from datetime import datetime
-import os
 
 app = Flask(__name__)
 
-CSV_FILE = "dataset_venin_wifi.csv"
+@app.route('/upload', methods=['POST'])
+def upload():
+    data = request.json
 
-# Créer le fichier CSV avec header si n'existe pas
-if not os.path.exists(CSV_FILE):
-    df = pd.DataFrame(columns=[
-        "timestamp", "poids", "temperature", "humidite",
-        "ax", "ay", "az",
-        "gx", "gy", "gz",
-        "mx", "my", "mz"
-    ])
-    df.to_csv(CSV_FILE, index=False)
+    # Affiche les données dans le terminal Flask
+    print("Reçu :", data)
 
-@app.route("/")
-def index():
-    return jsonify({"message": "Serveur Flask en ligne, prêt à recevoir des données WiFi."})
+    with open("data.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            datetime.now(),
+            data.get("weight"),
+            data.get("temp"),
+            data.get("hum"),
+            data.get("ax"),
+            data.get("ay"),
+            data.get("az"),
+            data.get("gx"),
+            data.get("gy"),
+            data.get("gz"),
+            data.get("mx"),
+            data.get("my"),
+            data.get("mz")
+        ])
 
-@app.route("/iot_data", methods=["POST"])
-def receive_data():
-    try:
-        data = request.get_json()
+    return "OK"
 
-        # Ajouter le timestamp côté serveur
-        data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Sauvegarder dans CSV
-        pd.DataFrame([data]).to_csv(CSV_FILE, mode="a", header=False, index=False)
-
-        print("Données reçues :", data)
-        return jsonify({"status": "success"}), 200
-
-    except Exception as e:
-        print("Erreur réception données :", e)
-        return jsonify({"status": "error", "message": str(e)}), 400
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+app.run(host="0.0.0.0", port=5000)

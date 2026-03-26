@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:login_signup/widgets/custom_line_chart.dart';
 import 'package:login_signup/widgets/extraction_button.dart';
@@ -37,13 +38,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    Navigator.pushAndRemoveUntil(context,
+    Navigator.pushAndRemoveUntil(
+      context,
       MaterialPageRoute(builder: (context) => const SignInScreen()),
       (route) => false,
     );
   }
 
-  // Méthode pour créer une carte personnalisée
+  // Carte personnalisée
   Widget buildDashboardCard({
     required IconData icon,
     required Color color,
@@ -80,10 +82,26 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
+  // 🔹 Méthode pour le graphique
+  Widget _chart1() {
+    return SizedBox(
+      height: 300,
+      width: double.infinity,
+      child: CustomLineChart(
+        data: [
+          FlSpot(1, 1),
+          FlSpot(2, 2),
+          FlSpot(3, 3),
+          FlSpot(4, 4),
+          FlSpot(5, 5),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ✅ APPBAR
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
@@ -92,10 +110,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           children: [
             Text(
               "Bienvenue $username 👋",
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             Text(
               "Email: $email | Date: ${getCurrentDate()}",
@@ -109,21 +124,17 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           IconButton(icon: const Icon(Icons.logout), onPressed: logout),
         ],
       ),
-
-      // ✅ BODY
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             const SizedBox(height: 20),
-
-            // Première ligne (2 cartes)
             Row(
               children: [
                 buildDashboardCard(
                   icon: Icons.biotech,
                   color: Colors.blue,
-                  title: " Total Extraction ",
+                  title: "Total Extraction",
                   iconSize: 30,
                   fontSize: 14,
                 ),
@@ -137,16 +148,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
-            // Deuxième ligne (2 cartes)
             Row(
               children: [
                 buildDashboardCard(
                   icon: Icons.access_time,
                   color: Colors.orange,
-                  title: "Durée Moyenne ",
+                  title: "Durée Moyenne",
                   iconSize: 30,
                   fontSize: 14,
                 ),
@@ -154,26 +162,18 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 buildDashboardCard(
                   icon: Icons.date_range,
                   color: Colors.purple,
-                  title: "Derniére Extraction",
+                  title: "Dernière Extraction",
                   iconSize: 30,
                   fontSize: 14,
                 ),
               ],
             ),
-                const SizedBox(height: 30),
-
-    // Bouton Extraction
-    const ExtractionButtons(),
-  const SizedBox(height: 30),
-        SizedBox(
-  height: 300,
-  width: double.infinity,
-  child: const CustomLineChart(),
-),
+            const SizedBox(height: 30),
+            const ExtractionButtons(),
+            const SizedBox(height: 30),
+            _chart1(),
           ],
-
         ),
-        
       ),
     );
   }
