@@ -1,374 +1,521 @@
-import 'package:fl_chart/fl_chart.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'signin_screen.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:login_signup/services/sensor_service.dart';
-import 'package:login_signup/services/control_service.dart';
-
+import 'package:login_signup/services/ai_service.dart';
+import 'monitoring_screen.dart';
+import 'prediction_screen.dart';
+import 'chatbot_screen.dart';
 class UserDashboardScreen extends StatefulWidget {
-  const UserDashboardScreen({Key? key}) : super(key: key);
-
+  const UserDashboardScreen({Key? key}) : super(key:key);
   @override
   State<UserDashboardScreen> createState() =>
       _UserDashboardScreenState();
 }
-
-class _UserDashboardScreenState extends State<UserDashboardScreen> {
-
-  // ================= USER =================
-  String username = "";
-  String email = "";
-
-  // ================= STATE =================
-  bool isLoading = true;
-  String error = "";
-
-  // ================= DATA =================
-  List<dynamic> sensors = [];
-  List<FlSpot> chartData = [];
-
-  // ================= SENSORS =================
-  double weight = 0;
-  double temperature = 0;
-  double humidity = 0;
-  double ax = 0;
-  double ay = 0;
-  double az = 0;
-
-  // ================= EXTRACTION =================
-  bool extractionON = false;
-
-  @override
-  void initState() {
-    super.initState();
-    loadDashboard();
-
-    // AUTO REFRESH
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 3));
-      if (!mounted) return false;
-      await loadDashboard();
-      return true;
-    });
-  }
-
-  // ================= LOAD DATA =================
-  Future<void> loadDashboard() async {
-    try {
-      setState(() {
-        isLoading = true;
-        error = "";
-      });
-
-      final prefs = await SharedPreferences.getInstance();
-      username = prefs.getString("username") ?? "";
-      email = prefs.getString("email") ?? "";
-
-      sensors = await SensorService.getSensors();
-      extractionON = await ControlService.getStatus();
-
-      if (sensors.isNotEmpty) {
-        final last = sensors.last;
-
-        weight = double.tryParse(last["weight"].toString()) ?? 0;
-        temperature = double.tryParse(last["temperature"].toString()) ?? 0;
-        humidity = double.tryParse(last["humidity"].toString()) ?? 0;
-
-        ax = double.tryParse(last["ax"].toString()) ?? 0;
-        ay = double.tryParse(last["ay"].toString()) ?? 0;
-        az = double.tryParse(last["az"].toString()) ?? 0;
-      }
-
-      chartData = sensors.asMap().entries.map((e) {
-        return FlSpot(
-          e.key.toDouble(),
-          double.tryParse(e.value["weight"].toString()) ?? 0,
-        );
-      }).toList();
-
-    } catch (e) {
-      error = "Erreur API : $e";
-    }
-
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  // ================= DATE =================
-  String getDate() {
-    final now = DateTime.now();
-    return "${now.day}/${now.month}/${now.year}";
-  }
-
-  // ================= LOGOUT =================
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const SignInScreen()),
-      (route) => false,
-    );
-  }
-
-  // ================= CARD =================
-  Widget card({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Card(
-        elevation: 5,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 35),
-              const SizedBox(height: 10),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(title),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ================= CHART =================
-  Widget buildChart() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: SizedBox(
-        height: 250,
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(show: true),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: chartData,
-                isCurved: true,
-                color: Colors.blue,
-                barWidth: 3,
-                belowBarData: BarAreaData(
-                  show: true,
-                  color: Colors.blue.withOpacity(0.2),
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ================= UI =================
-  @override
-  Widget build(BuildContext context) {
-
-    if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (error.isNotEmpty) {
-      return Scaffold(
-        body: Center(child: Text(error)),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Bienvenue $username 👋"),
-            Text("$email | ${getDate()}",
-                style: const TextStyle(fontSize: 12)),
-          ],
-        ),
-        actions: [
-          IconButton(
-              onPressed: loadDashboard,
-              icon: const Icon(Icons.refresh)),
-          IconButton(
-              onPressed: logout,
-              icon: const Icon(Icons.logout)),
-        ],
-      ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-
-            // ================= STATUS =================
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: extractionON
-                    ? Colors.green.shade100
-                    : Colors.red.shade100,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    extractionON
-                        ? Icons.check_circle
-                        : Icons.cancel,
-                    color: extractionON
-                        ? Colors.green
-                        : Colors.red,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    extractionON
-                        ? "EXTRACTION ACTIVE"
-                        : "EXTRACTION STOP",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: extractionON
-                          ? Colors.green
-                          : Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            // ================= BUTTONS =================
-            Row(
-              children: [
-
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green),
-                    onPressed: () async {
-                      await ControlService.startExtraction();
-                      setState(() => extractionON = true);
-                    },
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text("START"),
-                  ),
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red),
-                    onPressed: () async {
-                      await ControlService.stopExtraction();
-                      setState(() => extractionON = false);
-                    },
-                    icon: const Icon(Icons.stop),
-                    label: const Text("STOP"),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // ================= CARDS =================
-            Row(
-              children: [
-                card(
-                    icon: Icons.scale,
-                    title: "Poids",
-                    value: "$weight kg",
-                    color: Colors.blue),
-                const SizedBox(width: 10),
-                card(
-                    icon: Icons.thermostat,
-                    title: "Temp",
-                    value: "$temperature °C",
-                    color: Colors.red),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            Row(
-              children: [
-                card(
-                    icon: Icons.water_drop,
-                    title: "Humidité",
-                    value: "$humidity %",
-                    color: Colors.green),
-                const SizedBox(width: 10),
-                card(
-                    icon: Icons.vibration,
-                    title: "X",
-                    value: "$ax",
-                    color: Colors.orange),
-              ],
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              "📊 HX711 Weight Data",
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 15),
-
-            buildChart(),
-
-            const SizedBox(height: 25),
-
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15)),
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("MPU9250",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold)),
-                    Text("AX: $ax"),
-                    Text("AY: $ay"),
-                    Text("AZ: $az"),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _UserDashboardScreenState
+    extends State<UserDashboardScreen>{
+int currentIndex = 0;
+double weight = 0;
+double temperature = 0;
+double humidity = 0;
+double vibration = 0;
+String beeState = "En attente";
+String extractionResult = "En attente";
+double confidence = 0;
+// features venant du modèle IA
+Map<String,dynamic> features = {};
+Timer? timer;
+final List<String> titles = [
+"Dashboard",
+"Prédictions",
+"Monitoring",
+"Chatbot",
+"Paramètres"
+];
+@override
+void initState(){
+super.initState();
+loadSensorData();
+timer = Timer.periodic(
+const Duration(seconds:3),
+(e){
+loadSensorData();
 }
+);
+}
+@override
+void dispose(){
+timer?.cancel();
+super.dispose();
+}
+// ================= SENSOR + IA =================
+Future<void> loadSensorData() async{
+try{
+final data =
+await SensorService.getLastSensor();
+setState((){
+weight =
+double.tryParse(
+data["weight"].toString()
+) ?? 0;
+temperature =
+double.tryParse(
+data["temperature"].toString()
+) ?? 0;
+humidity =
+double.tryParse(
+data["humidity"].toString()
+) ?? 0;
+vibration =
+double.tryParse(
+data["vibration"].toString()
+) ?? 0;
+});
+final prediction =
+await AiService.predict({
+"weight":weight,
+"temperature":temperature,
+"humidity":humidity,
+"vibration":vibration
+});
+setState((){
+beeState =
+prediction["state"] ?? "unknown";
+extractionResult =
+prediction["extraction"] ?? "unknown";
+confidence =
+double.tryParse(
+prediction["confidence"].toString()
+) ?? 0;
+// récupération des features ML
+features =
+prediction["features"] ?? {};
+// correction confiance
+if(confidence <= 1){
+confidence = confidence * 100;
+}
+});
+}
+catch(e){
+print(e);
+}
+}
+@override
+Widget build(BuildContext context){
+return Container(
+decoration:
+const BoxDecoration(
+gradient:
+LinearGradient(
+colors:[
+Color(0xFF0A141E),
+Color(0xFF16324F),
+Color(0xFF050A12)
+],
+begin:
+Alignment.topLeft,
+end:
+Alignment.bottomRight
+)
+),
+child:
+Scaffold(
+backgroundColor:
+Colors.transparent,
+appBar:
+AppBar(
+backgroundColor:
+const Color(0xFF16324F),
+title:
+Text(
+titles[currentIndex],
+style:
+const TextStyle(
+color:Colors.white,
+fontWeight:FontWeight.bold
+)
+),
+),
+body:
+IndexedStack(
+index:
+currentIndex,
+children:[
+dashboardPage(),
+const PredictionScreen(),
+const MonitoringScreen(),
+const ChatbotScreen(),
+settingsPage(),
+],
+),
+bottomNavigationBar:
+BottomNavigationBar(
+currentIndex:
+currentIndex,
+type:
+BottomNavigationBarType.fixed,
+backgroundColor:
+const Color(0xFF0A141E),
+selectedItemColor:
+Colors.blue,
+unselectedItemColor:
+Colors.grey,
+onTap:(index){
+setState((){
+currentIndex=index;
+});
+},
+items:
+const[
+BottomNavigationBarItem(
+icon:Icon(Icons.dashboard),
+label:"Dashboard"
+),
+BottomNavigationBarItem(
+icon:Icon(Icons.psychology),
+label:"Prédictions"
+),
+BottomNavigationBarItem(
+icon:Icon(Icons.monitor_heart),
+label:"Monitoring"
+),
+BottomNavigationBarItem(
+icon:Icon(Icons.chat),
+label:"Chatbot"
+),
+BottomNavigationBarItem(
+icon:Icon(Icons.settings),
+label:"Paramètres"
+),
+],
+),
+),
+);
+}
+// ================= DASHBOARD PAGE =================
+Widget dashboardPage(){
+return SingleChildScrollView(
+padding:
+const EdgeInsets.all(8),
+child:Column(
+children:[
+const SizedBox(height:8),
+// ================= CAPTEURS =================
+Row(
+children:[
+sensorCard(
+Icons.scale,
+"Poids",
+"${weight.toStringAsFixed(2)} g",
+Colors.blue
+),
+const SizedBox(width:10),
+sensorCard(
+Icons.thermostat,
+"Température",
+"${temperature.toStringAsFixed(2)} °C",
+Colors.red
+),
+],
+),
+const SizedBox(height:8),
+Row(
+children:[
+sensorCard(
+Icons.water_drop,
+"Humidité",
+"${humidity.toStringAsFixed(2)} %",
+Colors.green
+),
+const SizedBox(width:10),
+sensorCard(
+Icons.vibration,
+"Vibration",
+vibration.toStringAsFixed(3),
+Colors.orange
+),
+],
+),
+const SizedBox(height:10),
+// ================= DECISION IA =================
+predictionCard(),
+const SizedBox(height:10),
+// ================= FEATURES IA =================
+featureChart(),
+],
+),
+);
+}
+// ================= SENSOR CARD =================
+Widget sensorCard(
+IconData icon,
+String title,
+String value,
+Color color
+){
+return Expanded(
+child:Card(
+color:
+const Color(0xFF141E2D),
+shape:
+RoundedRectangleBorder(
+borderRadius:
+BorderRadius.circular(8)
+),
+child:Padding(
+padding:
+const EdgeInsets.all(8),
+child:Column(
+children:[
+Icon(
+icon,
+color:color,
+size:35
+),
+const SizedBox(height:10),
+Text(
+value,
+style:
+TextStyle(
+color:color,
+fontSize:18,
+fontWeight:
+FontWeight.bold
+)
+),
+Text(
+title,
+style:
+const TextStyle(
+color:Colors.white70
+)
+),
+]
+)
+)
+)
+);
+}
+// ================= IA CARD =================
+Widget predictionCard(){
+Color stateColor;
+if(beeState.toLowerCase()=="optimal"){
+stateColor = Colors.green;
+}
+else if(beeState.toLowerCase()=="stress"){
+stateColor = Colors.red;
+}
+else{
+stateColor = Colors.orange;
+}
+return Card(
+color:
+const Color(0xFF141E2D),
+shape:
+RoundedRectangleBorder(
+borderRadius:
+BorderRadius.circular(8)
+),
+child:Padding(
+padding:
+const EdgeInsets.all(20),
+child:Column(
+crossAxisAlignment:
+CrossAxisAlignment.start,
+children:[
+const Row(
+children:[
+Icon(
+Icons.psychology,
+color:Colors.blue,
+size:35
+),
+SizedBox(width:10),
+Text(
+"Décision IA",
+style:
+TextStyle(
+color:Colors.white,
+fontSize:20,
+fontWeight:
+FontWeight.bold
+)
+)
+]
+),
+const SizedBox(height:10),
+Row(
+children:[
+const Text(
+"Etat abeilles : ",
+style:
+TextStyle(
+color:Colors.white70,
+fontSize:16
+)
+),
+Text(
+beeState.toUpperCase(),
+style:
+TextStyle(
+color:stateColor,
+fontSize:17,
+fontWeight:
+FontWeight.bold
+)
+)
+]
+),
+const SizedBox(height:12),
+Row(
+children:[
+const Text(
+"Extraction : ",
+style:
+TextStyle(
+color:Colors.white70,
+fontSize:16
+)
+),
+Text(
+extractionResult,
+style:
+const TextStyle(
+color:Colors.amber,
+fontSize:17,
+fontWeight:
+FontWeight.bold
+)
+)
+]
+),
+const SizedBox(height:12),
+Row(
+children:[
+const Text(
+"Confiance IA : ",
+style:
+TextStyle(
+color:Colors.white70
+)
+),
+Text(
+"${confidence.toStringAsFixed(1)} %",
+style:
+const TextStyle(
+color:Colors.blue,
+fontWeight:
+FontWeight.bold
+)
+)
+]
+)
+]
+)
+)
+);
+}
+// ================= FEATURES CHART =================
+Widget featureChart(){
+double tempMean =
+double.tryParse(
+features["temp_mean_1h"].toString()
+) ?? 0;
+double tempVariation =
+double.tryParse(
+features["temp_variation"].toString()
+) ?? 0;
+double humidityCombined =
+double.tryParse(
+features["humidity_combined"].toString()
+) ?? 0;
+double thermalStress =
+double.tryParse(
+features["thermal_stress"].toString()
+) ?? 0;
+double vibrationSpike =
+double.tryParse(
+features["vibration_spike"].toString()
+) ?? 0;
+double activityScore =
+double.tryParse(
+features["activity_score"].toString()
+) ?? 0;
+return Card(
+color:
+const Color(0xFF141E2D),
+shape:
+RoundedRectangleBorder(
+borderRadius:
+BorderRadius.circular(18)
+),
+child:Padding(
+padding:
+const EdgeInsets.all(15),
+child:Column(
+crossAxisAlignment:
+CrossAxisAlignment.start,
+children:[
+const Text(
+"📊 Features intelligentes IA",
+style:
+TextStyle(
+color:Colors.white,
+fontSize:15,
+fontWeight:
+FontWeight.bold
+)
+),
+const SizedBox(height:20),
+SizedBox(
+height:180,
+child:LineChart(
+LineChartData(
+gridData:
+const FlGridData(
+show:true
+),
+borderData:
+FlBorderData(
+show:false
+),
+titlesData:
+const FlTitlesData(
+show:true
+),
+lineBarsData:[
+LineChartBarData(
+isCurved:true,
+barWidth:3,
+spots:[
+FlSpot(0,tempMean),
+FlSpot(1,tempVariation),
+FlSpot(2,humidityCombined),
+FlSpot(3,thermalStress),
+FlSpot(4,vibrationSpike),
+FlSpot(5,activityScore),
+]
+)
+]
+)
+)
+)
+]
+)
+)
+);
+}
+// ================= SETTINGS =================
+Widget settingsPage(){
+return const Center(
+child:Text(
+"Paramètres système",
+style:
+TextStyle(
+color:Colors.white,
+fontSize:18
+)
+)
+);
+}
+    }

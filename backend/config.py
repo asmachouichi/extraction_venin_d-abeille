@@ -1,4 +1,4 @@
-SECRET_KEY = "super-secret-key"
+SECRET_KEY = "my_super_secure_secret_key_1234567890"
 JWT_SECRET_KEY = "jwt-secret-key"
 
 # ================= MYSQL (XAMPP) =================

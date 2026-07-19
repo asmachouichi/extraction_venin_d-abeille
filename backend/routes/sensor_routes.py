@@ -1,80 +1,102 @@
 from flask import Blueprint, request, jsonify
-from extensions import mysql
+import csv
+import os
+from datetime import datetime
 
 bp = Blueprint("sensor", __name__)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, "sensors.csv")
 
-# 📥 ADD SENSOR DATA (ESP32 / Arduino)
 
-@bp.route("/", methods=["POST"])
+# ================= CREATE CSV =================
+if not os.path.exists(CSV_FILE):
+    with open(CSV_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "timestamp",
+            "weight",
+            "temperature",
+            "humidity",
+            "vibration"
+        ])
+
+
+# ================= POST SENSOR =================
+@bp.route("", methods=["POST"])
 def add_sensor():
 
     try:
-        data = request.json
+        data = request.get_json()
 
-        weight = data.get("weight")
-        temperature = data.get("temperature")
-        humidity = data.get("humidity")
-        ax = data.get("ax")
-        ay = data.get("ay")
-        az = data.get("az")
+        if not data:
+            return jsonify({"error": "No data received"}), 400
 
-        cur = mysql.connection.cursor()
+        with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
 
-        cur.execute("""
-            INSERT INTO sensors(weight, temperature, humidity, ax, ay, az)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (weight, temperature, humidity, ax, ay, az))
+            writer.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                data.get("weight", 0),
+                data.get("temperature", 0),
+                data.get("humidity", 0),
+                data.get("vibration", 0)
+            ])
 
-        mysql.connection.commit()
-        cur.close()
+        print("CSV SAVED:", data)
 
-        return jsonify({
-            "message": "Sensor data saved successfully"
-        }), 201
+        return jsonify({"message": "saved"}), 201
 
     except Exception as e:
-        return jsonify({
-            "message": "Error saving sensor data",
-            "error": str(e)
-        }), 500
+        print("POST ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
-
-# 📊 GET SENSOR DATA (FLUTTER DASHBOARD)
-
+# ================= GET ALL =================
 @bp.route("/", methods=["GET"])
 def get_sensors():
 
     try:
-        cur = mysql.connection.cursor()
+        rows = []
 
-        cur.execute("""
-            SELECT weight, temperature, humidity, ax, ay, az
-            FROM sensors
-            ORDER BY id DESC
-            LIMIT 20
-        """)
+        with open(CSV_FILE, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
 
-        rows = cur.fetchall()
-        cur.close()
-
-        result = []
-
-        for r in rows:
-            result.append({
-                "weight": float(r[0]),
-                "temperature": float(r[1]),
-                "humidity": float(r[2]),
-                "ax": float(r[3]),
-                "ay": float(r[4]),
-                "az": float(r[5])
-            })
-
-        return jsonify(result), 200
+        return jsonify(rows), 200
 
     except Exception as e:
+        print("GET ERROR:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+# ================= GET LAST VALUE (FIXED) =================
+@bp.route("/last", methods=["GET"])
+def last_sensor():
+
+    try:
+        with open(CSV_FILE, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        if len(rows) == 0:
+            return jsonify({
+                "weight": 0,
+                "temperature": 0,
+                "humidity": 0,
+                "vibration": 0
+            }), 200
+
+        last = rows[-1]
+
+        # 🔥 FORCE SAFE FORMAT (IMPORTANT)
         return jsonify({
-            "message": "Error fetching sensor data",
-            "error": str(e)
-        }), 500
+            "weight": float(last.get("weight", 0)),
+            "temperature": float(last.get("temperature", 0)),
+            "humidity": float(last.get("humidity", 0)),
+            "vibration": float(last.get("vibration", 0))
+        }), 200
+
+    except Exception as e:
+        print("LAST ERROR:", e)
+        return jsonify({"error": str(e)}), 500
