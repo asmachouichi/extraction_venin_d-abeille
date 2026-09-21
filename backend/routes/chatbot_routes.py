@@ -8,15 +8,27 @@ chatbot_bp = Blueprint(
 )
 
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+# API Ollama
+OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
+
 
 
 @chatbot_bp.route("/chat", methods=["POST"])
 def chat():
 
-    data = request.json
+    data = request.get_json()
 
-    user_message = data.get("message")
+
+    if not data:
+        return jsonify({
+            "error": "Aucune donnée reçue"
+        }), 400
+
+
+
+    user_message = data.get("message", "").strip()
+
+
 
     if not user_message:
         return jsonify({
@@ -24,57 +36,211 @@ def chat():
         }), 400
 
 
+
+
     prompt = f"""
-Tu es un assistant expert en apiculture intelligente et en extraction du venin d'abeille.
 
-Ton rôle est d'aider l'apiculteur à comprendre et utiliser un système IoT intelligent.
+Tu es BeeGuardian AI, un assistant intelligent spécialisé dans
+l'apiculture intelligente et l'extraction du venin d'abeille.
 
-Informations sur le système :
-- Le système utilise une carte ESP32.
-- Les capteurs mesurent la température, l'humidité, le poids du venin et les vibrations.
-- Un modèle Machine Learning analyse les données et prédit l'état de la ruche.
-- L'application permet le suivi en temps réel et le contrôle de l'extraction.
 
-Règles de réponse :
-- Réponds toujours en français.
-- Donne des réponses simples, précises et utiles.
-- Explique les termes techniques.
-- Si tu ne connais pas une information, indique-le clairement.
-- Ne crée pas de fausses informations.
+Contexte du système :
 
-Question de l'utilisateur :
+Le système utilise :
+
+- Une carte ESP32 pour la collecte des données.
+- Des capteurs IoT :
+  * température
+  * humidité
+  * vibrations
+  * poids du venin
+
+Les données sont envoyées vers un serveur Flask.
+
+Un modèle Machine Learning Random Forest analyse les données
+et prédit l'état de la ruche :
+
+- Optimal
+- Normal
+- Stress
+
+
+L'application Flutter permet :
+
+- suivi en temps réel
+- historique des données
+- prédiction IA
+- contrôle du système d'extraction
+
+
+
+Ton rôle :
+
+Tu dois aider l'apiculteur à comprendre l'état de sa ruche.
+
+
+Règles obligatoires :
+
+- Réponds uniquement en français.
+- Ne traduis jamais la question.
+- Ne dis jamais "vous avez écrit".
+- Ne répète pas la question utilisateur.
+- Réponds directement au problème.
+- Explique simplement les termes techniques.
+- Donne des conseils pratiques.
+- Ne crée jamais de valeurs de capteurs inexistantes.
+- Si une information manque, indique :
+  "Je ne dispose pas de cette information."
+
+
+
+Structure de réponse obligatoire :
+
+
+Analyse :
+Explique la situation.
+
+
+Causes possibles :
+Liste les causes probables.
+
+
+Actions recommandées :
+Donne les actions à réaliser.
+
+
+
+Question utilisateur :
+
 {user_message}
+
+
 
 Réponse :
 """
 
 
+
     try:
 
+
         response = requests.post(
+
             OLLAMA_URL,
+
             json={
-                "model": "gemma3:1b",
+
+                "model": "mistral:7b",
+
                 "prompt": prompt,
+
                 "stream": False,
+
                 "options": {
-                    "temperature": 0.2
+
+                    "temperature": 0.2,
+
+                    "top_p": 0.9,
+
+                    "num_predict": 300
+
                 }
+
             },
-            timeout=60
+
+            timeout=300
+
         )
+
+
+
+        print("==============================")
+        print("QUESTION :", user_message)
+        print("STATUS :", response.status_code)
+        print("OLLAMA :", response.text)
+        print("==============================")
+
+
+
+        if response.status_code != 200:
+
+            return jsonify({
+
+                "error": "Erreur Ollama",
+
+                "details": response.text
+
+            }), 500
+
+
 
 
         result = response.json()
 
 
+
+        answer = result.get(
+            "response",
+            ""
+        )
+
+
+
+        if answer == "":
+
+            return jsonify({
+
+                "error":
+                "Ollama n'a pas généré de réponse"
+
+            }),500
+
+
+
+
         return jsonify({
-            "answer": result.get("response", "Pas de réponse")
+
+            "answer": answer
+
         })
+
+
+
+
+    except requests.exceptions.Timeout:
+
+
+        return jsonify({
+
+            "error":
+            "Temps de réponse dépassé"
+
+        }),500
+
+
+
+
+    except requests.exceptions.ConnectionError:
+
+
+        return jsonify({
+
+            "error":
+            "Ollama n'est pas démarré. Lancez ollama serve"
+
+        }),500
+
+
 
 
     except Exception as e:
 
+
+        print("ERREUR :", e)
+
+
         return jsonify({
+
             "error": str(e)
-        }), 500
+
+        }),500

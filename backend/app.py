@@ -30,12 +30,20 @@ from routes.sensor_routes import bp as sensor_bp
 from routes.control_routes import bp as control_bp
 from routes.ai_routes import bp_ai
 from routes.chatbot_routes import chatbot_bp
+from routes.admin_routes import admin
+from routes.user_routes import users_bp
+from routes.extraction_routes import extractions_bp
+from routes.alert_routes import alerts
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(sensor_bp, url_prefix="/sensors")
 app.register_blueprint(control_bp, url_prefix="/control")
 app.register_blueprint(bp_ai)
 app.register_blueprint( chatbot_bp,url_prefix="/ai")
+app.register_blueprint(admin)
+app.register_blueprint(users_bp)
+app.register_blueprint(extractions_bp)
+app.register_blueprint(alerts)
 # ================= AUTO ADMIN CREATION =================
 def create_admin():
     with app.app_context():

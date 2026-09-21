@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 import joblib
 import numpy as np
+from extensions import mysql
+
 
 
 bp_ai = Blueprint(
@@ -40,26 +42,142 @@ features = joblib.load(
 
 
 
+
+
+# ================= CREATE ALERT =================
+
+# ================= CREATE ALERT WITHOUT DUPLICATE =================
+
+def create_alert(
+        user_id,
+        alert_type,
+        message,
+        severity
+):
+
+    try:
+
+        if user_id is None:
+
+            print("USER ID MANQUANT")
+            return
+
+
+        cur = mysql.connection.cursor()
+
+
+        # Vérifier si une alerte identique non lue existe déjà
+
+        cur.execute(
+        """
+        SELECT id
+
+        FROM alerts
+
+        WHERE user_id=%s
+
+        AND type=%s
+
+        AND status='unread'
+
+        LIMIT 1
+
+        """,
+        (
+            user_id,
+            alert_type
+        )
+        )
+
+
+        existing_alert = cur.fetchone()
+
+
+
+        # Si elle existe déjà, ne pas créer une nouvelle
+
+        if existing_alert:
+
+            print("ALERT ALREADY EXISTS")
+
+            cur.close()
+
+            return
+
+
+
+        # Création de l'alerte
+
+        cur.execute(
+        """
+        INSERT INTO alerts
+        (
+            user_id,
+            type,
+            message,
+            severity,
+            status
+        )
+
+        VALUES
+        (%s,%s,%s,%s,'unread')
+
+        """,
+        (
+            user_id,
+            alert_type,
+            message,
+            severity
+        )
+        )
+
+
+        mysql.connection.commit()
+
+
+        cur.close()
+
+
+        print("ALERT CREATED")
+
+
+
+    except Exception as e:
+
+        print(
+            "ALERT ERROR : ",
+            e
+        )
+
 # ================= FEATURE ENGINEERING =================
-# ================= FEATURE ENGINEERING =================
+
 
 def feature_engineering(data):
 
 
-    weight = float(data.get("weight",0))
-
-    temperature = float(data.get("temperature",0))
-
-    humidity = float(data.get("humidity",0))
-
-    vibration = float(data.get("vibration",0))
+    weight = float(
+        data.get("weight",0)
+    )
 
 
+    temperature = float(
+        data.get("temperature",0)
+    )
 
-    # ================= FEATURES TEMPERATURE =================
+
+    humidity = float(
+        data.get("humidity",0)
+    )
+
+
+    vibration = float(
+        data.get("vibration",0)
+    )
+
 
 
     temp_mean_1h = temperature
+
 
 
     temp_variation = abs(
@@ -68,18 +186,16 @@ def feature_engineering(data):
 
 
 
-    # ================= HUMIDITY =================
-
-
     humidity_combined = (
+
         0.7 * humidity
+
         +
+
         0.3 * humidity
+
     )
 
-
-
-    # ================= STRESS =================
 
 
     thermal_stress = abs(
@@ -88,16 +204,10 @@ def feature_engineering(data):
 
 
 
-    # ================= VIBRATION =================
-
-
     vibration_spike = abs(
         vibration
     )
 
-
-
-    # ================= ACTIVITY =================
 
 
     activity_score = (
@@ -123,37 +233,31 @@ def feature_engineering(data):
         "vibration":vibration,
 
 
-
-        "temp_mean_1h":
-        temp_mean_1h,
+        "temp_mean_1h":temp_mean_1h,
 
 
-
-        "temp_variation":
-        temp_variation,
+        "temp_variation":temp_variation,
 
 
-
-        "humidity_combined":
-        humidity_combined,
+        "humidity_combined":humidity_combined,
 
 
-
-        "thermal_stress":
-        thermal_stress,
+        "thermal_stress":thermal_stress,
 
 
-
-        "vibration_spike":
-        vibration_spike,
+        "vibration_spike":vibration_spike,
 
 
-
-        "activity_score":
-        activity_score
-
+        "activity_score":activity_score
 
     }
+
+
+
+
+
+
+
 
 # ================= PREDICTION =================
 
@@ -169,51 +273,101 @@ def predict():
     try:
 
 
-        data=request.get_json()
+        data = request.get_json()
+
 
 
         print("AI INPUT")
+
         print(data)
 
 
 
-        engineered=feature_engineering(data)
+
+        # récupération user connecté
+
+        user_id = data.get("user_id")
 
 
 
-        X=np.array(
+        if user_id is None:
+
+
+            return jsonify({
+
+                "status":False,
+
+                "error":
+                "user_id manquant"
+
+            }),400
+
+
+
+
+
+
+        engineered = feature_engineering(data)
+
+
+
+
+
+        X = np.array(
 
             [
+
                 engineered[f]
+
                 for f in features
+
             ]
 
         ).reshape(1,-1)
 
 
 
-        # ========= STATE =========
+
+
+
+
+
+
+        # ================= STATE =================
 
 
         state_id = (
+
             state_model
             .predict(X)[0]
+
         )
+
 
 
         state = (
+
             state_encoder
             .inverse_transform(
+
                 [state_id]
+
             )[0]
+
         )
 
 
 
-        # ========= EXTRACTION =========
 
 
-        ext_id=(
+
+
+
+
+        # ================= EXTRACTION =================
+
+
+        ext_id = (
 
             ext_model
             .predict(X)[0]
@@ -221,41 +375,180 @@ def predict():
         )
 
 
-        extraction=(
+
+        extraction = (
 
             ext_encoder
             .inverse_transform(
+
                 [ext_id]
+
             )[0]
 
         )
 
 
 
-        # ========= SAFETY RULE =========
-
-
-        if state=="stress":
-
-            extraction="not_favorable"
 
 
 
-        # ========= CONFIDENCE =========
 
 
-        confidence=round(
+
+        # ================= SAFETY =================
+
+
+        if state == "stress":
+
+
+            extraction = "not_favorable"
+
+
+
+
+
+
+
+
+
+        # ================= ALERT SYSTEM =================
+
+
+        temperature = engineered["temperature"]
+
+        humidity = engineered["humidity"]
+
+        vibration = engineered["vibration"]
+
+
+
+
+
+
+
+        # -------- Stress abeilles --------
+
+
+        if state == "stress":
+
+
+            create_alert(
+
+                user_id,
+
+                "Stress abeilles",
+
+                "Etat de la ruche critique détecté par IA",
+
+                "HIGH"
+
+            )
+
+
+
+
+
+
+
+        # -------- Température --------
+
+
+        if temperature > 36:
+
+
+            create_alert(
+
+                user_id,
+
+                "Température élevée",
+
+                "La température dépasse la limite normale",
+
+                "HIGH"
+
+            )
+
+
+
+
+
+
+
+        # -------- Humidité --------
+
+
+        if humidity > 70:
+
+
+            create_alert(
+
+                user_id,
+
+                "Humidité élevée",
+
+                "Humidité trop élevée dans la ruche",
+
+                "MEDIUM"
+
+            )
+
+
+
+
+
+
+
+        # -------- Vibration --------
+
+
+        if vibration > 20:
+
+
+            create_alert(
+
+                user_id,
+
+                "Vibration anormale",
+
+                "Activité inhabituelle détectée",
+
+                "HIGH"
+
+            )
+
+
+
+
+
+
+
+
+
+        # ================= CONFIDENCE =================
+
+
+        confidence = round(
 
             max(
+
                 state_model
                 .predict_proba(X)[0]
+
             )
+
             *
+
             100,
 
             2
 
         )
+
+
+
+
+
+
 
 
 
@@ -277,7 +570,11 @@ def predict():
             "features":engineered
 
 
-        })
+        }),200
+
+
+
+
 
 
 
@@ -285,15 +582,19 @@ def predict():
 
 
         print(
-            "AI ERROR",
+            "AI ERROR : ",
             e
         )
 
 
+
         return jsonify({
+
 
             "status":False,
 
+
             "error":str(e)
+
 
         }),500

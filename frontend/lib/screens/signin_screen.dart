@@ -56,7 +56,7 @@ if(data["role"] == "admin"){
 Navigator.pushReplacement(
 context,
 MaterialPageRoute(
-builder: (_) => AdminDashboard_screen(),
+builder: (_) => AdminDashboardScreen(),
 ),
 );
 }
