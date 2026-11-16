@@ -44,7 +44,7 @@ features = joblib.load(
 
 
 
-# ================= CREATE ALERT =================
+
 
 # ================= CREATE ALERT WITHOUT DUPLICATE =================
 

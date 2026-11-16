@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:login_signup/screens/history_screen.dart';
 import 'package:login_signup/services/sensor_service.dart';
 import 'package:login_signup/services/ai_service.dart';
 import 'monitoring_screen.dart';
 import 'prediction_screen.dart';
 import 'chatbot_screen.dart';
+import 'history_screen.dart';
 class UserDashboardScreen extends StatefulWidget {
   const UserDashboardScreen({Key? key}) : super(key:key);
   @override
@@ -30,7 +32,7 @@ final List<String> titles = [
 "Prédictions",
 "Monitoring",
 "Chatbot",
-"Paramètres"
+"Historique"
 ];
 @override
 void initState(){
@@ -145,7 +147,7 @@ dashboardPage(),
 const PredictionScreen(),
 const MonitoringScreen(),
 const ChatbotScreen(),
-settingsPage(),
+const HistoryScreen(),
 ],
 ),
 bottomNavigationBar:
@@ -184,8 +186,8 @@ icon:Icon(Icons.chat),
 label:"Chatbot"
 ),
 BottomNavigationBarItem(
-icon:Icon(Icons.settings),
-label:"Paramètres"
+  icon: Icon(Icons.settings),
+  label: "Paramètres"
 ),
 ],
 ),

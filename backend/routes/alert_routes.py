@@ -9,9 +9,8 @@ alerts = Blueprint(
 
 
 
-# =====================================================
 # Afficher les alertes ADMIN (sans doublons)
-# =====================================================
+
 
 @alerts.route(
     "/admin/alerts",
